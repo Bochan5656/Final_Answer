@@ -3,6 +3,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 import re
+import ssl
+import socket
+from urllib.parse import urlparse
 
 base_url = 'https://r.gnavi.co.jp/eki/0002846/rs/'
 urls = []
@@ -56,8 +59,19 @@ for url in urls[:elements]:
     building_name = building.text.strip() if building else None
     
     # SSLの有無
-    store_url = soup.find('a', class_='url go-off').get('href') if soup.find('a', class_='url go-off') else None
-    ssl_status = 'True' if store_url and 'https://' in store_url else 'False'
+    #store_url = soup.find('a', class_='url go-off').get('href') if soup.find('a', class_='url go-off') else None
+    store_url = soup.find('a', class_='sv-of').get('href') if soup.find('a', 'sv-of') else None
+    # URLを解析してホスト名を取得
+    parsed_url = urlparse(store_url)
+    host = parsed_url.hostname
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((host, 443)) as sock:
+            with context.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+                ssl_status = 'True'
+    except Exception:
+        ssl_status = 'False'
     
     # データフレームに追加
     new_row = pd.DataFrame([{
