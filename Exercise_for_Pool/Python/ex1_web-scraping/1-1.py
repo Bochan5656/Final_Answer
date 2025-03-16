@@ -55,9 +55,9 @@ for url in urls[:elements]:
     building = soup.find('span', class_='locality')
     building_name = building.text.strip() if building else None
     
-    # SSLの有無(独自のホームページがある時のみ検証　それ以外はTrue)
+    # SSLの有無
     store_url = soup.find('a', class_='url go-off').get('href') if soup.find('a', class_='url go-off') else None
-    ssl_status = 'False' if store_url and 'https' in store_url else 'True'
+    ssl_status = 'True' if store_url and 'https://' in store_url else 'False'
     
     # データフレームに追加
     new_row = pd.DataFrame([{

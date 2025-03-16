@@ -6,6 +6,9 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import pandas as pd
 import time
 import re
+import ssl
+from urllib.parse import urlparse
+import socket
 
 # WebDriverのセットアップ
 driver = webdriver.Chrome()
@@ -50,26 +53,26 @@ for url in urls:
     # 店舗名
     try:
         store_name = driver.find_element(By.ID, 'info-name').text
-    except NoSuchElementException:
+    except Exception:
         store_name = None
     
     # 電話番号
     try:
         phone_number = driver.find_element(By.CLASS_NAME, 'number').text
-    except NoSuchElementException:
+    except Exception:
         phone_number = None
 
     # メールアドレス
     try:
         mail_element = driver.find_element(By.LINK_TEXT, 'お店に直接メールする')
         mail_address = mail_element.get_attribute('href')
-    except NoSuchElementException:
+    except Exception:
         mail_address = None
 
     # 住所
     try:
         address = driver.find_element(By.CLASS_NAME, 'region').text
-    except NoSuchElementException:
+    except Exception:
         address = None
 
     # 都道府県、市区町村、番地に分割
@@ -88,17 +91,38 @@ for url in urls:
     # 建物名
     try:
         building_name = driver.find_element(By.CLASS_NAME, 'locality').text
-    except NoSuchElementException:
+    except Exception:
         building_name = None
 
     # 店舗URL
     try:
-        store_url = driver.find_element(By.CSS_SELECTOR, '.url.go-off').get_attribute('href')
-    except NoSuchElementException:
+        original_tab = driver.current_window_handle  # 元のタブを記憶
+        official_page = driver.find_element(By.CLASS_NAME, 'sv-of')
+        # オフィシャルページへ遷移
+        official_page.click()
+        driver.set_page_load_timeout(60)
+
+        driver.switch_to.window(driver.window_handles[-1])
+        store_url = driver.current_url  # オフィシャルページのurlを取得
+        host = urlparse(store_url).hostname  # ホスト名を取得
+        
+        # タブを閉じる
+        driver.close()
+        driver.switch_to.window(original_tab)
+    except Exception:
+        print('オフィシャルページなし')
         store_url = None
+        host = None
     
-    # SSLの有無を判定
-    ssl_status = 'False' if store_url and 'http' in store_url else 'True'
+    # SSL証明書の有無を判定
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((host, 443)) as sock:
+            with context.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+                ssl_status = 'True'
+    except Exception:
+        ssl_status = 'False'
 
     # データをデータフレームに追加
     new_row = {
@@ -122,5 +146,5 @@ for url in urls:
 driver.quit()
 print(df)
 
-# CSVに書き込みß
+# CSVに書き込み
 df.to_csv('./Python/ex1_web-scraping/1-2.csv', encoding='utf-8-sig', index=False)
